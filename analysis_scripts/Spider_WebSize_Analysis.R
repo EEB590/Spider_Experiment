@@ -4,7 +4,9 @@
 #Do spiders build smaller webs when birds are present? If so, then web size should be smaller on Saipan than on Guam. (note the N=1 problem here).
 #Does this vary depending on whether spider was transplanted or found in the area? 
 
-setwd("~/Box Sync/Teaching/Rstats/Spider_Experiment/data/working")
+library(ggplot2)
+
+setwd("data/working")
 transplant<-read.csv("transplant.csv")
 
 #################
@@ -28,6 +30,8 @@ boxplot(transplant$websize~ transplant$Island, xlab="Island",  ylab="websize")
 #c.	Collinearity X: correlation between covariates
 #i.	Plot each predictor against each other (since categorical, will use table to make sure we have all combinations)
 with(transplant, table(Island, Native)) #have all combinations here. 
+#if samples are unequal, can't use anova(model)
+##good = balanced, bad = unequal sample sizes, ugly = one or more combination is missing
 
 #d.	Look at relationships of Y vs X’s to see if homogenous variances at each X value, linear relationships
 # i.	Plot response against each predictor and random effect. 
@@ -40,6 +44,8 @@ ggplot(transplant, aes(Native, websize, color=Island))+
 ggplot(transplant, aes(Native, websize, color=Island))+
   geom_boxplot()+
   facet_grid(.~Site)
+with(transplant, ftable(Island, Native, Site))
+
 #well, we only sampled at 2 sites on Guam, and three sites on Saipan, and we don't have all levels of Native for all sites. But nothing really stands out in terms of site-level effects. 
 
 #ii. Are there other potential factors that reduce independence of Y’s? 
@@ -52,9 +58,15 @@ ggplot(transplant, aes(Native, websize, color=Island))+
 #Is the quality of the data good enough to include them? (i.e. do we have enough samples for each level of the interaction?) 
 with(transplant, table(Island, Native))
 
+#summary
+# no obvious outliers
+# can go ahead looking at web size relative to island and native. 
+# there is a lot of variability - is there something I might have measured related to web size that is not the thing I'm testing? 
+
 #################################################
 # Fix up dataframe
 # a.	Remove missing values (NA’s)
+# 
 # Not applicable
 
 # b. Standardize continuous predictors (if necessary)
@@ -66,6 +78,7 @@ with(transplant, table(Island, Native))
 ###########  Analysis   ###############
 
 #1) Does web size differ between islands, and does transplanting affect web size? 
+
 #using all data
 #websize~Island*Native, family=gaussian  #by default, an identity link
 
@@ -73,13 +86,15 @@ webmod1<-lm(websize~Island*Native, data=transplant)
 summary(webmod1)
 
 # Opinions on model selection- much disagreement about which is best. 
-# 1. Classical Hypothesis testing: drop 1
+# 1. Classical Hypothesis testing: drop1 #Philip doesn't use this
+#   use lmerTest() in lmerTest package, or anova in car package to do Type III sums of squares
 # 2. Classic model selection: Use LRT to come up with best model
 # 3. Information theoretic approach- compare models using AIC- get competing models
-# 4. Don’t do any model selection at all- fit model that you think makes sense, and keep everything as it is, even non-significant parameters. Only ask about interactions using model selection, but once fit model with main effect terms, then stick with it. 
+# 4. If you do an experiment, don’t do any model selection at all- fit model that you think makes sense, and keep everything as it is, even non-significant parameters. Only ask about interactions using model selection, but once fit model with main effect terms, then stick with it. 
 
 ##
 drop1(webmod1)
+anova(webmod1) #shouldn't do this because unequal samples (Philip?)
 
 ##
 webmod2<-lm(websize~Island+Native, data=transplant)
@@ -89,7 +104,8 @@ webmod_null<-lm(websize~1, data=transplant)
 AIC(webmod1, webmod2, webmod3, webmod4, webmod_null) #webmod3 has lowest AIC, by almost 2 points
 
 ##
-anova(webmod1)  #matches AIC comparison results
+anova(webmod1, webmod2)  #matches AIC comparison results
+
 ##
 confint(webmod1) 
 

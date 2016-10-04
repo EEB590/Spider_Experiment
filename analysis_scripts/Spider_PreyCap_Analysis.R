@@ -2,12 +2,23 @@
 ####### Prey Capture Analysis #############
 ###########################################
 
-#Research Questions
+#Research Question:
+
 #Do webs on Guam capture more prey than webs on Saipan? We want to know whether the number of prey captured varies by island (and thus, by bird presence/absence). 
 #Model: preynum~island, family=poisson
 
+setwd("~/Box Sync/Teaching/Rstats/Spider_Experiment/data/working")
+preycapL<-read.csv("preycapturelong.csv")
 
 ###### Data Exploration ############
+
+#A. Outliers in Y, Outliers in X
+
+
+#B. Zero Inflation Y 
+#
+
+#C. 
 table(preycapL$preynum,preycapL$island) #shows preynum by island-
 with(preycapL, table(obs, site)) #concerns me that no obs2 through obs8 data on Guam- i.e. no data from transplanted spiders.
 #see how preynum varies by site

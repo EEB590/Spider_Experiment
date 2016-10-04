@@ -1,6 +1,5 @@
 #Spider transplant data munging
-#
-#
+
 #load libraries
 library(reshape2) #for melt
 library(tidyr)
@@ -10,8 +9,8 @@ library(ggplot2)
 
 #may need to install tibble first, and may need to restart R session to clear conflicting packages
 
-
 #read in data
+setwd("~/Box Sync/Teaching/Rstats/Spider_Experiment/data/raw")
 transplant<-read.csv("Saipan_Guam_Transplant_asentered.csv")
 
 #look at data
@@ -20,8 +19,11 @@ summary(transplant)
 
 #some data cleaning needed
 levels(transplant$Island) <- gsub("Gaum", "Guam", levels(transplant$Island))
+levels(transplant$Island) <- gsub("Siapan", "Saipan", levels(transplant$Island))
 transplant$Site<-tolower(transplant$Site)
-#what else needs to be cleaned? 
+
+#Rename Web Size variable
+transplant<-dplyr::rename(transplant, websize = WebSize.cm.)
 
 #create column of 1/0 for web present/absent and spider pres/absent
 transplant$SpidPresBin[transplant$SpidPres=="no"] <-0 #if spider is absent at end, put 0
@@ -39,5 +41,6 @@ with(transplant[transplant$Native=="no" & transplant$SpidPres=="no",], table(Net
 #compare ftable to table
 with(transplant[transplant$Native=="no" & transplant$SpidPres=="no",], ftable(Netting, Island, WebPres))
 
-#get subset that was actually transplanted rather than ones that were observed in place        
-truetrans<-transplant[transplant$Native=="no",]
+#create working database for analysis
+setwd("~/Box Sync/Teaching/Rstats/Spider_Experiment/data/working")
+write.csv(transplant, "transplant.csv")

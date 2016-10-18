@@ -5,6 +5,8 @@
 #Does this vary depending on whether spider was transplanted or found in the area? 
 
 library(ggplot2)
+library(car)
+library(lsmeans)
 
 setwd("data/working")
 transplant<-read.csv("transplant.csv")
@@ -85,29 +87,56 @@ with(transplant, table(Island, Native))
 webmod1<-lm(websize~Island*Native, data=transplant)
 summary(webmod1)
 
+#check out the design matrix
+head(model.matrix(webmod1))
+
 # Opinions on model selection- much disagreement about which is best. 
-# 1. Classical Hypothesis testing: drop1 #Philip doesn't use this
-#   use lmerTest() in lmerTest package, or anova in car package to do Type III sums of squares
-# 2. Classic model selection: Use LRT to come up with best model
-# 3. Information theoretic approach- compare models using AIC- get competing models
-# 4. If you do an experiment, don’t do any model selection at all- fit model that you think makes sense, and keep everything as it is, even non-significant parameters. Only ask about interactions using model selection, but once fit model with main effect terms, then stick with it. 
 
-##
-drop1(webmod1)
-anova(webmod1) #shouldn't do this because unequal samples (Philip?)
+# 1. Classical Hypothesis testing: drop all nonsignificant predictors, then report final model and interpret differences between levels of a predictor in final model. 
 
-##
+# anova(model) gives Type I sums of squares, which means the reference level is tested first and then other levels, and then interactions. R defaults to treatment contrasts. Can get different results for unbalanced datasets depending on which factor is entered first in the model and thus considered first. 
+
+##can use car package to do Type II or III sums of squares
+#Type III can be used with interactions
+Anova(webmod1, type="III") 
+
+#explore contrasts
+options('contrasts') #shows what contrasts R is using
+#can set contrasts to SAS default. 
+webmod1a<-lm(websize~Island*Native, data=transplant, contrasts = list(Island = "contr.SAS", Native="contr.SAS"))
+summary(webmod1a)
+
+#Type II
+Anova(lm(websize~Island+Native, data=transplant), type="II")  #note - type II can't handle interactions
+#compare against 
+anova(lm(websize~Native+Island, data=transplant))
+anova(lm(websize~Island+Native, data=transplant))
+
+#lsmeans
+islnat<-pairs(lsmeans(webmod1, ~Island | Native)) # in lsmeans package
+natisl <- pairs(lsmeans(webmod1, ~Native | Island))
+rbind(islnat, natisl)
+
+# 2. Classic model selection: Create all sub-models. Use LRT to come up with best model. 
 webmod2<-lm(websize~Island+Native, data=transplant)
 webmod3<-lm(websize~Island, data=transplant)
 webmod4<-lm(websize~Native, data=transplant)
 webmod_null<-lm(websize~1, data=transplant)
-AIC(webmod1, webmod2, webmod3, webmod4, webmod_null) #webmod3 has lowest AIC, by almost 2 points
 
-##
-anova(webmod1, webmod2)  #matches AIC comparison results
+anova(webmod1, webmod2)  #model 1 not sig better than 2
+anova(webmod2, webmod3)  #model 2 not sig better than 3
+anova(webmod3, webmod4) #can't run this, because not sub-model - needs to be nested to compare with LRT
+anova(webmod3, webmod_null) #model 3 sig better fit than null model
 
-##
-confint(webmod1) 
+# 3. Information theoretic approach- compare models using AIC- get competing models. AIC is a measure of the goodness of fit of an estimated statistical model. It is -2*log-likelihood + 2*npar, where npar is the number of effective parameters in the model. More complex models get penalized. 
+
+AIC(webmod1, webmod2, webmod3, webmod4, webmod_null) #webmod3 has lowest AIC, by almost 2 points. Might consider model averaging. 
+
+#check out packages MuMIn and AICcmodavg for a variety of useful tools. 
+
+# 4. If you do an experiment, don’t do any model selection at all- fit model that you think makes sense, and keep everything as it is, even non-significant parameters. Some might choose to do some model selection to keep only significant interactions, but once fit model with main effect terms, then stick with it. 
+
+confint(webmod3) #Saipan webs are significantly smaller than Guam (confidence intervals do not overlap 0)
 
 #Model validation
 #A. Look at homogeneity: plot fitted values vs residuals
@@ -116,7 +145,10 @@ confint(webmod1)
 #      plot residuals vs each covariate in the model
 #      plot residuals vs each covariate not in the model
 #      Common sense 
-#D. Look at normality: histogram
+#D. Look at normality of residuals: histogram
+
+#for lm can use plot(model)
+plot(webmod1)
 
 #extract residuals
 E1 <- resid(webmod1, type = "pearson")

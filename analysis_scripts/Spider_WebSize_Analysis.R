@@ -86,6 +86,9 @@ with(transplant, table(Island, Native))
 
 webmod1<-lm(websize~Island*Native, data=transplant)
 summary(webmod1)
+anova(webmod1) #should not use if unbalanced
+
+lm(websize~Island*Native, data=transplant)
 
 #check out the design matrix
 head(model.matrix(webmod1))
@@ -95,6 +98,8 @@ head(model.matrix(webmod1))
 # 1. Classical Hypothesis testing: drop all nonsignificant predictors, then report final model and interpret differences between levels of a predictor in final model. 
 
 # anova(model) gives Type I sums of squares, which means the reference level is tested first and then other levels, and then interactions. R defaults to treatment contrasts. Can get different results for unbalanced datasets depending on which factor is entered first in the model and thus considered first. 
+
+with(transplant,tapply(websize, list(Island, Native), mean))
 
 ##can use car package to do Type II or III sums of squares
 #Type III can be used with interactions

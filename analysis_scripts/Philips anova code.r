@@ -21,6 +21,8 @@
 # i.e. what is done to an observation is the combination of factor levels
 #   so the analysis should start there
 
+library(multcompView)
+library(lsmeans)
 ---------------------------------------
 # properties of the data set
 
@@ -77,7 +79,7 @@ pairs(websize.isl)
 contrast(websize.isl, 'trt.vs.ctrl1')
 
 # the full list of comparisons is given by
-#   ls("package:lsmeans", pat=".lsmc")
+# ls("package:lsmeans", pat=".lsmc")
 # pairs() is a shortcut for pairwise contrasts
 
 # can calculate both the lsmeans and contrasts at once
@@ -87,7 +89,7 @@ lsmeans(websize.grid1, "Native", contr="pairwise")
 
 # cld() gives a nice graphic of the group differences
 #   but a necessary library, multcompview, is not available for R 3.3
-
+cld(websize.isl)
 #  to get the overall F test:
 # save the pairwise differences and do a joint test that all = 0
 
@@ -175,7 +177,7 @@ websize.grid5 <- ref.grid(websize.lm5)
 websize.grid5
 
 # aside: anova() appears to give tests
-anova(websize.grid5)
+anova(websize.lm5)
 
 # BUT meaningless!!!  
 # notice that df for interaction is not what you expect

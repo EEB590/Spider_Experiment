@@ -58,7 +58,7 @@ transplant<-unite(transplant, enddate, c(enddate, year), sep="-")
 transplant$enddate<-dmy(transplant$enddate)
 
 #Now, create a new column called duration
-transplant$duration<-transplant$enddate-transplant$startdate
+transplant$duration<-as.numeric(transplant$enddate-transplant$startdate)
 
 # Remove column total days because it is not raw data, but calculated data, so shouldn't be in final dataset
 #use "Select" - to select columns from a dataframe to include or drop

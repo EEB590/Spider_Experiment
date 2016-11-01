@@ -1,105 +1,105 @@
-#########################################
+#############################################
 ####### spider transplant analysis ##########
-#########################################
+#############################################
 
-#Research questions: 
-#1) Does the duration of time a spider stays on its web differ between island or treatment? 
-#using all data
-#Total.Days~island*netting, family=poisson (could do this as a hazard rate, but I don't see a reason to)
+#load data
+transplant<-read.csv("transplant.csv")
 
-#2) If a spider is missing, is the web more likely to be present without a spider inhabiting it (indicative of predation) on Saipan than on Guam? 
-#using subset of data with spiders missing (omit ones where spiders remained entire time)
-#WebPresBin~island*Netting, family=binomial
+###########################################################
+#load libraries
+library(lsmeans)
+library(ggplot2)
 
+###########################################################
+#Research question 1) Does the duration of time a spider stays on its web differ between island or treatment? 
+#using all data from transplanted spiders
+#duration~island*netting, family=poisson (could do this as a hazard rate, but not for this )
+
+###########################################################
 #Notes about the study
-#Transplanting was done in two sites on Guam and Two Sites on Saipan 
-#
+#Transplanting was done in two sites on Guam and two sites on Saipan
+#Use transplanted spiders only, because very few "native" spiders on Saipan.
+#but can compare back to spiders found in wild, though to see if a similar duration. 
+truetrans<-transplant[transplant$native=="no",]
+native<-transplant[transplant$native=="yes",]
+############ Data exploration #####################
 ##a.  Outliers in Y / Outliers in X 
-#i.	plot response and predictors to check for outliers  (only with continuous data)
-#1.	Use Mydotplot or dotplot or boxplot, identify outliers
-hist(truetrans$Total.Days)
-boxplot(truetrans$Total.Days~ truetrans$Island*truetrans$Netting , xlab="Island + Treatment",  ylab="Total Days") #only those transplanted
-boxplot(transplant$Total.Days~transplant$Island*transplant$Netting, ylab="Total Days") #all spiders (already present + transplants)
+#plot response and predictors to check for outliers  (only with continuous data)
+hist(truetrans$duration)
+hist(native$duration) #one possible outlier 
+
+boxplot(truetrans$duration~ truetrans$island*truetrans$netting , xlab="island + treatment",  ylab="Total Days") #only those transplanted, no obvious outliers
+
+boxplot(native$duration~native$island, ylab="Total Days") #only  spiders found in forest, not transplanted, so can't use "netting"
+#outlier is on Saipan, without netting. 
+
+max(truetrans$duration) #8 days
+max(native$duration) #9 days
+
+#another way of visualizing same thing - violin plots are like boxplots, but provide more information about the density of points than a boxplot. 
+ggplot(truetrans, aes(island, duration, fill=netting))+
+  geom_violin()+
+  #geom_boxplot(width=0.2)+ #just to see what a boxplot would look like
+  theme_bw() #a lot of zeros in Saipan without netting
+
+ggplot(native, aes(island, duration))+
+  geom_violin()+
+  theme_bw() #can see the outlier here. 
 
 #b.	Examine Zero inflation Y
-#i.	What proportion of response values = zero? 
-with(truetrans, table(Total.Days)) # no zeros. 
-with(truetrans, table(WebPresBin)) #binary- can't be zero-inflated
+# What proportion of response values = zero? 
+with(truetrans, table(duration)) # no zeros. 
+with(native, table(duration)) #no zeros
 
 #c.	Collinearity X: correlation between covariates
-#i.	Plot each predictor against each other
-with(truetrans, table(Island, Netting))
+#Plot each predictor against each other 
+#our predictors are both factors, so use a table. 
+with(truetrans, table(island, netting)) #we have all combinations represented. 
+with(native, table(island, netting)) #no netting data for "native" spiders
 
-#d.	Linearity and homogeneity - Look at relationships of Y vs X’s:
-# i.	Plot response against each predictor and random effect. 
-ggplot(truetrans, aes(Netting, Total.Days, color=Island))+
+#d.	Linearity and homogeneity - Look at relationships of Y vs X’s. Is the relationship linear (for continuous-continuous relationships)? Is the variance homogeneous?
+# Plot response against each predictor and random effect. 
+ggplot(truetrans, aes(netting, duration, color=island))+
   geom_boxplot()
-#yes- linear and mostly homogeneous
+#yes-  mostly homogeneous - the Saipan-NoNetting combo looks like it might have less variance- will check residuals for a more rigorous test. 
 
 #e.	Independence Y
-#1.	Is there a pattern across time or space that is not incorporated in the model? 
-ggplot(truetrans, aes(Netting, Total.Days, color=Island))+
+#Is there a pattern across time or space that is not incorporated in the model? 
+#we didn't sample across time, but we did sample at two sites/island.
+ggplot(truetrans, aes(netting, duration, color=island))+
   geom_boxplot()+
-  facet_grid(.~Site)
-#could incorporate transect into main effects- but prob not part of an interaction bc small sample size, and effect of netting is consistent across transects. But I think it's okay to ignore transect). 
-with(truetrans, ftable(Site, Netting, WebPresBin)) 
+  facet_grid(.~site)
+#could incorporate site into main effects- but prob not part of an interaction bc small sample size, and effect of netting is consistent across sites. I think it's okay to ignore site. 
 
-#ii. Are there other potential factors that reduce independence of Y’s? 
-with(truetrans, ftable(Island, Netting))
-with(truetrans, ftable(Island, Netting, WebPresBin)) #only 3 situtaions where web still present but spider gone on Guam, two inside netting one without. 
+#Are there other potential factors that reduce independence of Y’s? #not that I can think of... 
 
-#f.	Sufficient and balanced data?  - Yes 
-#i.	Are categorical covariates balanced? - Yes
+#f.	Sufficient and balanced data?  
+# Are categorical covariates balanced (island, netting)? - Yes
 # Adequate sample size- yes
+with(truetrans, ftable(island, netting))
 
-#ii.	Examine interactions
-#1.	Is the quality of the data good enough to include them? (i.e. do we have enough samples for each level of the interaction?) - Yes
-with(truetrans, table(Island, Netting))
+#Examine interactions - Is the quality of the data good enough to include them? (i.e. do we have enough samples for each level of the interaction?) - Yes
+with(truetrans, table(island, netting))
 
-# 3)	Fix up dataframe
-# a.	Remove missing values (NA’s)
+####### summary #########
+# in general, seems good. The Saipan-NoNetting combo for truetrans may not have homogeneous variance - will need to check residuals. 
 
-#explore data visually
+# if we use native data, may have an issue with the outlier for Saipan-NoNetting. 
 
-bargraph.CI(truetrans$Island, truetrans$Total.Days, group=truetrans$Netting, legend=F, ylab="Number of days", color=c("grey", "black")) 
-legend(3, 5.3, bty="n", c( "With netting", "Without netting"), fill=c("grey", "black"))
+###### any decisions made that lead to changes in data frame?###
+#nothing at this point. 
 
-bargraph.CI(truetrans$Island, truetrans$WebPresBin, group=truetrans$Netting, legend=T, ylab="Fraction of Webs Present", main="Web Presents or Absent")
-with(truetrans, table(Island, WebPresBin, Netting))
-
-ggplot(transplant, aes(x=Island, y=WebSize.cm., fill=Native))+
-  geom_boxplot()
-
-ggplot(truetrans, aes(Island, Total.Days, fill=Netting))+
-  geom_violin()+
-  theme_bw()
-
-ggplot(transplant, aes(Island, Total.Days, fill=Netting))+
-  geom_violin()+
-  theme_bw()+
-  facet_grid(.~Native)
-
-ggplot(truetrans, aes(Island, WebPresBin, fill=Netting))+
-  geom_violin()+
-  theme_bw()
-
-####Analyze data##################
+#######################################
+####Analyze data#######################
+#######################################
 
 #### Question 1 ####################
-#1) Does the duration of time a spider stays on its web differ between island or treatment? 
+#1) Does the duration of time a spider stays on its web differ between island or treatment? Does the effect of netting very depending on island (Guam = no birds, saipan = birds)? 
 #using all data from transplanted spiders
-#Total.Days~island*netting, family=poisson 
 
-tmod<-glm(Total.Days~Island*Netting, family= poisson, data=truetrans)
-tmod1<-glm(Total.Days~Island+Netting, family= poisson, data=truetrans)
-tmod2<-glm(Total.Days~Island, family= poisson, data=truetrans)
-tmod3<-glm(Total.Days~Netting, family= poisson, data=truetrans)
-tmod4<-glm(Total.Days~1, family= poisson, data=truetrans)
-AIC(tmod, tmod1, tmod2, tmod3, tmod4) #tmod (full model) is definitely best
+tmod<-glm(duration~island*netting, family= poisson, data=truetrans)
 
-summary(tmod)# a little underdispersed
-confint(tmod) 
-anova(tmod, test="Chisq") 
+# check model fit
 plot(tmod)
 
 #extract residuals
@@ -119,26 +119,97 @@ plot(x = F1,
      cex.lab = 1.5)
 abline(h = 0, lty = 2)
 
-plot(x=truetrans$Island, y=F1) #heterogeneity in residuals bt islands
-plot(x=truetrans$Netting, y=F1) #heterogeneity in residuals wrt Netting
-plot(x=truetrans$Site, y=F1) #residual variance larger at Saipan sites than Guam sites, but homogeneity bt sites within an island
+plot(x=truetrans$island, y=F1) #heterogeneity in residuals bt islands
+plot(x=truetrans$netting, y=F1) #heterogeneity in residuals wrt netting
+plot(x=truetrans$site, y=F1) #residual variance larger at Saipan sites than Guam sites, but homogeneity bt sites within an island
 
-###### Question 2 #############
-##2) If a spider is missing, is the web more likely to be present without a spider inhabiting it (indicative of predation) on Saipan than on Guam? 
+#hypothesis testing - do 
+
+#
+#
+#######################################################
+#Research Question 2) If a spider is missing, is the web more likely to be present without a spider inhabiting it (indicative of predation) on Saipan than on Guam? 
+##webpresbin~island*netting, family=binomial
 #using subset of data with spiders missing (omit ones where spiders remained entire time)
-#WebPresBin~island*Netting, family=binomial
-truetransnosp<-truetrans[!is.na(truetrans$WebPresBin),]
+truetransnosp<-truetrans[!is.na(truetrans$webpresbin),]
 
-todweb<-glm(WebPresBin~Island*Netting, family=binomial, data=truetransnosp)
-todweb1<-glm(WebPresBin~Island+Netting, family= binomial, data=truetransnosp)
-todweb2<-glm(WebPresBin~Island, family= binomial, data=truetransnosp)
-todweb3<-glm(WebPresBin~Netting, family= binomial, data=truetransnosp)
-todweb4<-glm(WebPresBin~1, family= binomial, data=truetransnosp)
-AIC(todweb, todweb1, todweb2, todweb3, todweb4) #tmod (full model) is definitely best
+#########################################################
+############ Data exploration #####################
+#########################################################
+##a.  Outliers in Y / Outliers in X 
+#plot response and predictors to check for outliers  (only with continuous data)
+hist(truetrans$duration)
+
+boxplot(truetrans$duration~ truetrans$island*truetrans$netting , xlab="island + treatment",  ylab="Total Days") #only those transplanted
+
+boxplot(transplant$duration~transplant$island*transplant$netting, ylab="Total Days") #all spiders (already present + transplants)
+
+#b.	Examine Zero inflation Y
+# What proportion of response values = zero? 
+with(truetrans, table(duration)) # no zeros. 
+with(truetrans, table(webpresbin)) #binary- can't be zero-inflated
+
+#c.	Collinearity X: correlation between covariates
+#i.	Plot each predictor against each other
+with(truetrans, table(island, netting))
+
+#d.	Linearity and homogeneity - Look at relationships of Y vs X’s:
+# i.	Plot response against each predictor and random effect. 
+ggplot(truetrans, aes(netting, duration, color=island))+
+  geom_boxplot()
+#yes- linear and mostly homogeneous
+
+#e.	Independence Y
+#1.	Is there a pattern across time or space that is not incorporated in the model? 
+ggplot(truetrans, aes(netting, duration, color=island))+
+  geom_boxplot()+
+  facet_grid(.~site)
+#could incorporate transect into main effects- but prob not part of an interaction bc small sample size, and effect of netting is consistent across transects. But I think it's okay to ignore transect). 
+
+with(truetrans, ftable(site, netting, webpresbin)) 
+
+#ii. Are there other potential factors that reduce independence of Y’s? 
+with(truetrans, ftable(island, netting))
+with(truetrans, ftable(island, netting, webpresbin)) #only 3 situtaions where web still present but spider gone on Guam, two inside netting one without. 
+
+#f.	Sufficient and balanced data?  - Yes 
+#i.	Are categorical covariates balanced? - Yes
+# Adequate sample size- yes
+
+#ii.	Examine interactions
+#1.	Is the quality of the data good enough to include them? (i.e. do we have enough samples for each level of the interaction?) - Yes
+with(truetrans, table(island, netting))
+
+# 3)	Fix up dataframe
+# a.	Remove missing values (NA’s)
+
+####### summary #########
+
+
+#explore data visually
+
+with(truetrans, table(island, webpresbin, netting))
+
+ggplot(transplant, aes(x=island, y=WebSize.cm., fill=Native))+
+  geom_boxplot()
+
+ggplot(truetrans, aes(island, duration, fill=netting))+
+  geom_violin()+
+  theme_bw()
+
+ggplot(transplant, aes(island, duration, fill=netting))+
+  geom_violin()+
+  theme_bw()+
+  facet_grid(.~Native)
+
+ggplot(truetrans, aes(island, webpresbin, fill=netting))+
+  geom_violin()+
+  theme_bw()
+
+#### Analyze data ##################
+todweb<-glm(webpresbin~island*netting, family=binomial, data=truetransnosp)
 
 summary(todweb) #not overdispersed
-confint(todweb) 
-anova(todweb, test="Chisq") 
 plot(todweb)
 
 #extract residuals
@@ -158,6 +229,8 @@ plot(x = F1,
      cex.lab = 1.5)
 abline(h = 0, lty = 2)
 
-plot(x=truetransnosp$Island, y=F1) #heterogeneity in residuals bt islands
-plot(x=truetransnosp$Netting, y=F1) #some heterogeneity in residuals wrt Netting
-plot(x=truetransnosp$Site, y=F1) #residual variance larger at Saipan sites than Guam sites, but homogeneity bt sites within an island
+plot(x=truetransnosp$island, y=F1) #heterogeneity in residuals bt islands
+plot(x=truetransnosp$netting, y=F1) #some heterogeneity in residuals wrt netting
+plot(x=truetransnosp$site, y=F1) #residual variance larger at Saipan sites than Guam sites, but homogeneity bt sites within an island
+
+#### Hypothesis testing #############

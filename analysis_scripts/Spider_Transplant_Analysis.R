@@ -21,7 +21,9 @@ library(ggplot2)
 #Use transplanted spiders only, because very few "native" spiders on Saipan.
 #but can compare back to spiders found in wild, though to see if a similar duration. 
 truetrans<-transplant[transplant$native=="no",]
+truetrans$site<-factor(truetrans$site) #gets rid of ghost levels
 native<-transplant[transplant$native=="yes",]
+
 ############ Data exploration #####################
 ##a.  Outliers in Y / Outliers in X 
 #plot response and predictors to check for outliers  (only with continuous data)
@@ -86,7 +88,7 @@ with(truetrans, table(island, netting))
 
 # if we use native data, may have an issue with the outlier for Saipan-NoNetting. 
 
-###### any decisions made that lead to changes in data frame?###
+###### any decisions made that lead to changes in data frame? perhaps remove NA's, standardize continuous predictors?###
 #nothing at this point. 
 
 #######################################
@@ -97,18 +99,44 @@ with(truetrans, table(island, netting))
 #1) Does the duration of time a spider stays on its web differ between island or treatment? Does the effect of netting very depending on island (Guam = no birds, saipan = birds)? 
 #using all data from transplanted spiders
 
-tmod<-glm(duration~island*netting, family= poisson, data=truetrans)
+#We are going to employ the "we set up an experiment, so we will fit and interpret results from the full model" philosophy. 
 
-# check model fit
-plot(tmod)
+tmod<-glm(duration~island*netting, family= poisson, data=truetrans)
+summary(tmod)
+
+# check model fit using plot function
+plot(tmod) #gives fitted vs residuals, Normal Quantile-Quantile plot, leverage
+#useful site for interpreting QQ plots: http://stats.stackexchange.com/questions/101274/how-to-interpret-a-qq-plot
+
+#check model fit by hand. Check for overdispersion, plot fitted vs resduals, check for sources of heterogeneity in residuals. 
 
 #extract residuals
-E1 <- resid(tmod, type = "pearson")
+E1 <- resid(tmod, type = "pearson") 
 
-#check for overdispersion
-sum(E1^2) / (nrow(truetrans) - length(coef(tmod))) #0.7 - not overdispersed
+####### Overdispersion ############
+#check for overdispersion: residual deviance/degrees of freedom
+##can get this from the summary command above. Or use this below for a quick and dirty approach that will work even for glmer's. 
+sum(E1^2) / (nrow(truetrans) - length(coef(tmod))) #0.65 - not overdispersed (which would be something >1); somewhat underdispersed, actually. 
 
-#plot fitted vs residuals
+#if model is over-dispersed, have some options: 
+#  #A. Outliers? ==> Look at Cook’s Distances >1. If only one, remove it. But if a lot, maybe not the reason for all of the overdispersion.
+cd<-cooks.distance(tmod)
+cd[cd>1]
+#B. Missing covariates or interactions?  ==> Go back or add a latent variable 
+#C. Zero inflation?            ==> Check proportion of data that are zeros. Be concerned >25%. ZIP. 
+#D. Large variance?            ==> Negative binomial
+#F. Non-linear patterns        ==> Look at xyplot to see if nonlinear patterns (especially over time). Need a lot of observations to do GAM. Plot residuals against each linear covariate, and look for nonlinear patterns, if have them, may need GAM. 
+#** if don’t have enough observations to do GAM, can do variable + variable^2 as predictors. 
+#*** or can make time a factor
+#G. Wrong link function        ==> Change it
+
+#Other solutions: 
+#***quasi-Poisson (blow up standard errors) – but not option in glmm. 
+#***Observation-level random intercept (Pandora’s box) – latent covariate and it will take care of it., any info that can’t be captured in fixed or random component will be taken up by this latent variable. Doesn’t have full flexibility because we are imposing a distribution on him (normal with mean 0 and variance sigma-squared). Gives larger standard errors. If use this, add in full model, then do model selection. 
+#Can use observation-level random effect for poisson, nb, binomial. However, if don’t have very many levels of a random effect, the observation-level random effect will steal all of the variance from the other random effect. 
+
+## Back to model validation ######
+#look for homogeneity of variances - plot fitted vs residuals
 F1 <- fitted(tmod, type = "response")
 
 par(mfrow = c(2,2), mar = c(5,5,2,2))
@@ -119,14 +147,57 @@ plot(x = F1,
      cex.lab = 1.5)
 abline(h = 0, lty = 2)
 
-plot(x=truetrans$island, y=F1) #heterogeneity in residuals bt islands
-plot(x=truetrans$netting, y=F1) #heterogeneity in residuals wrt netting
-plot(x=truetrans$site, y=F1) #residual variance larger at Saipan sites than Guam sites, but homogeneity bt sites within an island
+#Look at independence by plotting residuals against covariates in model, and those not in model. 
+plot(x=truetrans$island, y=E1) #heterogeneity in residuals bt islands
+plot(x=truetrans$netting, y=E1) #heterogeneity in residuals wrt netting
+plot(x=truetrans$site, y=E1) #residual variance slightly larger at Saipan sites than Guam sites, but homogeneity bt sites within an island
 
-#hypothesis testing - do 
+#Also consider: Plotting residuals versus time (if relevant)
+#Plotting residuals versus spatial coordinates (if relevant)
 
-#
-#
+#Check for normality of residuals
+hist(E1) #looks pretty good. 
+
+#look for influential values
+
+######Results model validation ######
+#Looks ok...no structure in residuals...go to next step
+
+#############################
+# hypothesis testing  #######
+summary(tmod) #really, we care most about the interaction the effect of netting is different on Guam than on Saipan. Basically, being on saipan without netting is bad. Could stop here. 
+
+#Or use lsmeans to test interaction too. 
+
+tmod.grid1 <- ref.grid(tmod)
+# start by creating a reference grid: essentially the cell structure
+# the grid object contains the model and the data
+
+summary(tmod.grid1)
+#  gives cell means for each combination of factor levels
+
+--------------
+
+# tests of differences:
+
+# can calculate both the lsmeans and contrasts at once
+lsmeans(tmod.grid1, "island", contr="pairwise")
+lsmeans(tmod.grid1, "netting", contr="pairwise")
+# pairwise differences are in the $contrasts part of the result
+
+# test the interaction
+# compute pairwise differences within each level of one factor
+int.isl <- pairs(tmod.grid1, by='island')
+int.isl
+#  No-Yes results for each Island
+
+int.isl2 <- update(int.isl, by=NULL)
+int.isl2
+#  convert to a table with 2 rows (from a list of two contrasts)
+
+test(pairs(int.isl2), joint=T)
+# which we can then compare using a joint test
+
 #######################################################
 #Research Question 2) If a spider is missing, is the web more likely to be present without a spider inhabiting it (indicative of predation) on Saipan than on Guam? 
 ##webpresbin~island*netting, family=binomial

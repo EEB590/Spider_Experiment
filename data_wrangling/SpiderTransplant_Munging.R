@@ -1,4 +1,4 @@
-#Spider transplant data munging
+#Spider transplant experiment data munging
 
 #load libraries
 library(reshape2) #for melt
@@ -10,6 +10,8 @@ library(lubridate)
 
 #read in data
 setwd("data/raw")
+# setwd("..") #may need to use this and one below if changed to working directory
+# setwd("raw")
 transplant<-read.csv("Saipan_Guam_Transplant_asentered.csv")
 
 #look at data
@@ -77,8 +79,8 @@ transplant$webpresbin[transplant$spidpres=="yes"] <-NA #adds a NA to webpresbin 
 #separating one column into two columns
 transplant<-separate(transplant, col=web, into=c("web_a", "web_b"), sep="'", remove=F)
 
-#combining two columns into one column (note the underscore after unite)
-transplant<-unite_(transplant, "webv2", c("web_a", "web_b"), sep="", remove=T)
+#combining two columns into one column (note the underscore after unite), rename same as original name to overwrite it. 
+transplant<-unite_(transplant, "web", c("web_a", "web_b"), sep="", remove=T)
 #######################
 summary(transplant)
 

@@ -102,6 +102,8 @@ with(truetrans, table(island, netting))
 #We are going to employ the "we set up an experiment, so we will fit and interpret results from the full model" philosophy. 
 
 tmod<-glm(duration~island*netting, family= poisson, data=truetrans)
+#note that the default link function is log, to change this, need to add family=poisson(link=identity) or whatever alternative link you want. 
+
 summary(tmod)
 
 # check model fit using plot function
@@ -167,20 +169,15 @@ hist(E1) #looks pretty good.
 # hypothesis testing  #######
 summary(tmod) #really, we care most about the interaction the effect of netting is different on Guam than on Saipan. Basically, being on saipan without netting is bad. Could stop here. 
 
-#Or use lsmeans to test interaction too. 
+#Or can use lsmeans to test interaction 
 
 tmod.grid1 <- ref.grid(tmod)
 # start by creating a reference grid: essentially the cell structure
 # the grid object contains the model and the data
 
-summary(tmod.grid1)
-#  gives cell means for each combination of factor levels
+summary(tmod.grid1) # gives cell means for each combination of factor levels
 
---------------
-
-# tests of differences:
-
-# can calculate both the lsmeans and contrasts at once
+# tests of differences between levels of main effects:
 lsmeans(tmod.grid1, "island", contr="pairwise")
 lsmeans(tmod.grid1, "netting", contr="pairwise")
 # pairwise differences are in the $contrasts part of the result
@@ -195,13 +192,13 @@ int.isl2 <- update(int.isl, by=NULL)
 int.isl2
 #  convert to a table with 2 rows (from a list of two contrasts)
 
-test(pairs(int.isl2), joint=T)
-# which we can then compare using a joint test
+test(pairs(int.isl2), joint=T) # compare using a joint test
 
 #######################################################
 #Research Question 2) If a spider is missing, is the web more likely to be present without a spider inhabiting it (indicative of predation) on Saipan than on Guam? 
 ##webpresbin~island*netting, family=binomial
-#using subset of data with spiders missing (omit ones where spiders remained entire time)
+
+#use subset of data with spiders missing (omit ones where spiders remained entire time)
 truetransnosp<-truetrans[!is.na(truetrans$webpresbin),]
 
 #########################################################
@@ -209,85 +206,68 @@ truetransnosp<-truetrans[!is.na(truetrans$webpresbin),]
 #########################################################
 ##a.  Outliers in Y / Outliers in X 
 #plot response and predictors to check for outliers  (only with continuous data)
-hist(truetrans$duration)
+hist(truetransnosp$webpresbin) #binary, so not useful. 
+with(truetransnosp, unique(webpresbin)) #yes, all 1's and 0's. 
+with(truetransnosp, ftable(webpresbin, island, netting))
 
-boxplot(truetrans$duration~ truetrans$island*truetrans$netting , xlab="island + treatment",  ylab="Total Days") #only those transplanted
+boxplot(truetransnosp$webpresbin~ truetransnosp$island*truetransnosp$netting , xlab="island + treatment",  ylab="Total Days")  #not very useful
 
-boxplot(transplant$duration~transplant$island*transplant$netting, ylab="Total Days") #all spiders (already present + transplants)
 
 #b.	Examine Zero inflation Y
 # What proportion of response values = zero? 
-with(truetrans, table(duration)) # no zeros. 
-with(truetrans, table(webpresbin)) #binary- can't be zero-inflated
+ #binary- can't be zero-inflated
 
 #c.	Collinearity X: correlation between covariates
 #i.	Plot each predictor against each other
-with(truetrans, table(island, netting))
+with(truetransnosp, table(island, netting)) #not many left on Guam without netting and without spiders
 
 #d.	Linearity and homogeneity - Look at relationships of Y vs X’s:
 # i.	Plot response against each predictor and random effect. 
-ggplot(truetrans, aes(netting, duration, color=island))+
-  geom_boxplot()
-#yes- linear and mostly homogeneous
+ggplot(truetransnosp, aes(netting, webpresbin, color=island))+
+  geom_violin()
+#not particularly useful
 
 #e.	Independence Y
 #1.	Is there a pattern across time or space that is not incorporated in the model? 
-ggplot(truetrans, aes(netting, duration, color=island))+
-  geom_boxplot()+
+ggplot(truetransnosp, aes(netting, webpresbin, color=island))+
+  geom_violin()+
   facet_grid(.~site)
-#could incorporate transect into main effects- but prob not part of an interaction bc small sample size, and effect of netting is consistent across transects. But I think it's okay to ignore transect). 
-
-with(truetrans, ftable(site, netting, webpresbin)) 
+#site seems okay - some variation, but prob not too important. 
 
 #ii. Are there other potential factors that reduce independence of Y’s? 
-with(truetrans, ftable(island, netting))
-with(truetrans, ftable(island, netting, webpresbin)) #only 3 situtaions where web still present but spider gone on Guam, two inside netting one without. 
+with(truetransnosp, ftable(island, netting, webpresbin)) #only 3 situtaions where web still present but spider gone on Guam, two inside netting one without. 
 
-#f.	Sufficient and balanced data?  - Yes 
-#i.	Are categorical covariates balanced? - Yes
-# Adequate sample size- yes
+#f.	Sufficient and balanced data?  
+#i.	Are categorical covariates balanced? enough. 
+# Adequate sample size- enough. 
 
 #ii.	Examine interactions
-#1.	Is the quality of the data good enough to include them? (i.e. do we have enough samples for each level of the interaction?) - Yes
+#1.	Is the quality of the data good enough to include them? (i.e. do we have enough samples for each level of the interaction?) - depends on effect size- this is a pretty big effect, so probably okay. 
 with(truetrans, table(island, netting))
 
 # 3)	Fix up dataframe
-# a.	Remove missing values (NA’s)
+# Remove missing values (NA’s)
+# standardize continuous predictors
 
 ####### summary #########
-
-
-#explore data visually
-
-with(truetrans, table(island, webpresbin, netting))
-
-ggplot(transplant, aes(x=island, y=WebSize.cm., fill=Native))+
-  geom_boxplot()
-
-ggplot(truetrans, aes(island, duration, fill=netting))+
-  geom_violin()+
-  theme_bw()
-
-ggplot(transplant, aes(island, duration, fill=netting))+
-  geom_violin()+
-  theme_bw()+
-  facet_grid(.~Native)
-
-ggplot(truetrans, aes(island, webpresbin, fill=netting))+
-  geom_violin()+
-  theme_bw()
+#seems fine - no need to do anything special at this point. 
 
 #### Analyze data ##################
+#for binomial models, the response can be either a vector (e.g. 1's and 0's) or a matrix with two columns, one for "successes" and one for "failures" where these columns are cbind'ed together. 
+ 
 todweb<-glm(webpresbin~island*netting, family=binomial, data=truetransnosp)
+#default link in binomial family is logit. 
 
-summary(todweb) #not overdispersed
+### model validation ######
 plot(todweb)
 
-#extract residuals
+#by hand#####
+##extract residuals
 E1 <- resid(todweb, type = "pearson")
 
-#check for overdispersion
-sum(E1^2) / (nrow(truetransnosp) - length(coef(todweb))) #0.91 - not overdispersed
+#check for overdispersion 
+##no need to do this for binary data, because can't be overdispersed
+##proportion data, on the other hand, can be overdispersed. 
 
 #plot fitted vs residuals
 F1 <- fitted(todweb, type = "response")
@@ -300,8 +280,56 @@ plot(x = F1,
      cex.lab = 1.5)
 abline(h = 0, lty = 2)
 
-plot(x=truetransnosp$island, y=F1) #heterogeneity in residuals bt islands
-plot(x=truetransnosp$netting, y=F1) #some heterogeneity in residuals wrt netting
-plot(x=truetransnosp$site, y=F1) #residual variance larger at Saipan sites than Guam sites, but homogeneity bt sites within an island
+plot(x=truetransnosp$island, y=E1) #heterogeneity in residuals bt islands
+plot(x=truetransnosp$netting, y=E1) #some heterogeneity in residuals wrt netting
+plot(x=truetransnosp$site, y=E1) #residual variance larger at Saipan sites than Guam sites, but homogeneity bt sites within an island
 
+#Check for normality of residuals
+hist(E1) #meh - not great, but maybe tolerable? 
+
+#look for influential values
+library(car)
+influencePlot(todweb,	id.method="identify", main="Influence Plot", sub="Circle size is proportial to Cook's Distance" )
+
+######Results model validation ######
+#Looks ok...probably no structure in residuals...go to next step
+#
 #### Hypothesis testing #############
+
+summary(todweb) #really, we care most about the interaction the effect of netting on whether the web is present or not is different on Guam than on Saipan. Basically, being on saipan without netting is bad. 
+
+#Or can use lsmeans to test interaction 
+todweb.grid1 <- ref.grid(todweb)
+# start by creating a reference grid: essentially the cell structure
+# the grid object contains the model and the data
+
+summary(todweb.grid1) # gives cell means for each combination of factor levels
+
+# tests of differences between levels of main effects:
+lsmeans(todweb.grid1, "island", contr="pairwise")
+lsmeans(todweb.grid1, "netting", contr="pairwise")
+# pairwise differences are in the $contrasts part of the result
+
+# test the interaction
+# compute pairwise differences within each level of one factor
+int.isl <- pairs(todweb.grid1, by='island')
+int.isl
+#  No-Yes results for each Island
+
+int.isl2 <- update(int.isl, by=NULL)
+int.isl2
+#  convert to a table with 2 rows (from a list of two contrasts)
+#  if you don't have netting on Saipan, have a very high probability of still having a web present (webpresbin=1), indicating that a bird picked you (as a spider) off your web. 
+#### 
+library(boot) #for inverse logit function
+inv.logit() #exp(x)/(1+exp(x))
+inv.logit(3.23)
+
+test(pairs(int.isl2), joint=T) # compare using a joint test
+
+### Get predicted values ####
+
+newdata <- with(truetransnosp,expand.grid(island=levels(island), netting=levels(netting)))
+newdata$predicted<-predict(todweb, newdata, type="response")
+
+#interestingly, saipan, with netting is also slightly more likely to have the web still present when the spider is gone. Maybe there is another spider predator out there besides birds? 

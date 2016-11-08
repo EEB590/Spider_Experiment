@@ -3,6 +3,7 @@
 #############################################
 
 #load data
+setwd("data/working")
 transplant<-read.csv("transplant.csv")
 
 ###########################################################
@@ -101,7 +102,7 @@ with(truetrans, table(island, netting))
 
 #We are going to employ the "we set up an experiment, so we will fit and interpret results from the full model" philosophy. 
 
-tmod<-glm(duration~island*netting, family= poisson, data=truetrans)
+tmod<-glm(duration~island*netting, family=poisson, data=truetrans)
 #note that the default link function is log, to change this, need to add family=poisson(link=identity) or whatever alternative link you want. 
 
 summary(tmod)
@@ -149,6 +150,8 @@ plot(x = F1,
      cex.lab = 1.5)
 abline(h = 0, lty = 2)
 
+#95% should be between -2 and +2. 
+#another check from overdispersion is that pearson residuals are more variable than that. 
 #Look at independence by plotting residuals against covariates in model, and those not in model. 
 plot(x=truetrans$island, y=E1) #heterogeneity in residuals bt islands
 plot(x=truetrans$netting, y=E1) #heterogeneity in residuals wrt netting
@@ -157,7 +160,7 @@ plot(x=truetrans$site, y=E1) #residual variance slightly larger at Saipan sites 
 #Also consider: Plotting residuals versus time (if relevant)
 #Plotting residuals versus spatial coordinates (if relevant)
 
-#Check for normality of residuals
+#Check for normality of residuals (for poisson to see if have large counts (above 2 or below -2 for glm, bc standardized) - residuals won't be normal bc poisson)
 hist(E1) #looks pretty good. 
 
 #look for influential values
@@ -175,7 +178,7 @@ tmod.grid1 <- ref.grid(tmod)
 # start by creating a reference grid: essentially the cell structure
 # the grid object contains the model and the data
 
-summary(tmod.grid1) # gives cell means for each combination of factor levels
+summary(tmod.grid1, type="response") # gives cell means for each combination of factor levels
 
 # tests of differences between levels of main effects:
 lsmeans(tmod.grid1, "island", contr="pairwise")
@@ -255,8 +258,10 @@ with(truetrans, table(island, netting))
 #### Analyze data ##################
 #for binomial models, the response can be either a vector (e.g. 1's and 0's) or a matrix with two columns, one for "successes" and one for "failures" where these columns are cbind'ed together. 
  
-todweb<-glm(webpresbin~island*netting, family=binomial, data=truetransnosp)
+todweb<-glm(cbind(successes, failures)~island*netting, family=binomial, data=truetransnosp)
 #default link in binomial family is logit. 
+
+cbind(successes, failures)
 
 ### model validation ######
 plot(todweb)
